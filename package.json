@@ -1,0 +1,40 @@
+{
+  "name": "botify-dashboard",
+  "version": "1.0.0",
+  "description": "MQTT Dashboard with Aedes broker, voltage monitoring, and Telegram notifications",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "keywords": [
+    "mqtt",
+    "aedes",
+    "express",
+    "esp32",
+    "telegram",
+    "iot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@paralleldrive/cuid2": "^3.3.0",
+    "aedes": "^0.48.1",
+    "axios": "^1.6.0",
+    "body-parser": "^1.20.2",
+    "chalk": "^5.6.2",
+    "dotenv": "^16.3.1",
+    "ejs": "^4.0.1",
+    "express": "^4.18.2",
+    "figlet": "^1.10.0",
+    "mqtt": "^4.3.7",
+    "mysql2": "^3.6.5",
+    "pretty-js-log": "^1.2.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

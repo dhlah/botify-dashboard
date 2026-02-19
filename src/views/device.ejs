@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<%- include('partials/header', { title: 'Device Page' }) %>
+
+    <body class="bg-gray-50 flex justify-center items-start min-h-screen pt-10">
+        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3"></div>
+        <main class="w-full max-w-md bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+
+            <div class="bg-slate-800 p-6 text-white flex justify-between items-start">
+                <div>
+                    <h2 class="text-xl font-bold tracking-wide">
+                        <%= deviceInfo.name %>
+                    </h2>
+                    <p class="text-slate-400 text-sm font-mono mt-1">ID: #<%= deviceInfo.id %>
+                    </p>
+                </div>
+
+                <div id="device-connection-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300
+                <%= (deviceInfo.deviceState === 'online') 
+                    ? 'bg-green-500/10 border-green-500 text-green-400' 
+                    : 'bg-red-500/10 border-red-500/50 text-red-400' %>">
+
+                    <div class="relative flex h-2.5 w-2.5">
+                        <span id="conn-ping"
+                            class="<%= (deviceInfo.deviceState === 'online') ? 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' : 'hidden' %>"></span>
+                        <span id="conn-dot"
+                            class="relative inline-flex rounded-full h-2.5 w-2.5 <%= (deviceInfo.deviceState === 'online') ? 'bg-green-500' : 'bg-red-500' %>"></span>
+                    </div>
+
+                    <span id="conn-text" class="text-xs font-bold uppercase tracking-wider">
+                        <%= (deviceInfo.deviceState==='online' ) ? 'Connected' : 'Disconnected' %>
+                    </span>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-4 grid grid-cols-1 gap-4">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-4">
+                    <span class="text-gray-500 font-medium">Status Relay</span>
+                    <div data-status>
+                        <% if (lastValue==1) { %>
+                            <div id="relay-status"
+                                class="flex items-center gap-1.5 px-2 py-1 rounded-full <%= lastValue.value ? 'bg-green-500/20' : 'bg-gray-500/20' %>">
+
+                                <span id="relay-dot"
+                                    class="h-1.5 w-1.5 rounded-full <%= lastValue.value ? 'bg-green-400 animate-pulse' : 'bg-gray-400' %>">
+                                </span>
+
+                                <span id="relay-text"
+                                    class="text-xs font-bold uppercase tracking-wider <%= lastValue.value ? 'text-green-300' : 'text-gray-300' %>">
+                                    <%= lastValue.value==1 ? 'Online' : 'Offline' %>
+                                </span>
+                            </div>
+                            <% } else { %>
+                                <div id="relay-status"
+                                    class="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/20">
+
+                                    <span id="relay-dot" class="h-1.5 w-1.5 rounded-full bg-red-400"></span>
+
+                                    <span id="relay-text"
+                                        class="text-xs font-bold uppercase tracking-wider text-red-300">
+                                        Offline
+                                    </span>
+                                </div>
+                                <% } %>
+                    </div>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Last Relay Update</span>
+                    <span class="text-sm text-gray-600" data-last-active>
+                        <%= lastValue ? formatTime(lastValue.timestamp) : '-' %>
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4" data-device-values>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Firmware</span>
+                        <span class="font-mono text-gray-800">
+                            <%= deviceInfo.version %>
+                        </span>
+                    </div>
+
+
+                </div>
+            </div>
+            <div class="block">
+                <div class="bg-gray-50 p-4 border-t grid grid-cols-2 border-gray-100 text-center">
+                    <a href="/device" class="text-blue-600 text-sm font-semibold hover:text-blue-800 transition">Back to Devices</a>
+                    <a href="/device/<%= deviceInfo.id %>/logs" class="text-blue-600 text-sm font-semibold hover:text-blue-800 transition">Logs
+                        &rarr;</a>
+                </div>
+            </div>
+        </main>
+
+        <script src="/socket.io/socket.io.min.js"></script>
+        <script>
+
+            const deviceId = '<%= deviceInfo.id %>';
+            const socket = io();
+            let previousValues = {};
+            let relayTimeout = null;
+
+            function showToast(message, type = "info", duration = 3000) {
+                const colors = {
+                    success: "bg-green-500",
+                    error: "bg-red-500",
+                    info: "bg-blue-500",
+                    warning: "bg-yellow-500"
+                };
+
+                const toast = document.createElement("div");
+                toast.className = `
+                    ${colors[type] || colors.info}
+                    text-white px-4 py-3 rounded-xl shadow-lg
+                    transform translate-x-full opacity-0
+                    transition-all duration-300 ease-in-out
+                    flex items-center gap-2 min-w-[220px]
+                `;
+
+                toast.innerHTML = `
+                    <span class="flex-1">${message}</span>
+                    <button class="opacity-70 hover:opacity-100">✕</button>
+                `;
+                document.getElementById("toast-container").appendChild(toast);
+
+                // animate in
+                setTimeout(() => {
+                    toast.classList.remove("translate-x-full", "opacity-0");
+                }, 10);
+
+                // close function
+                const removeToast = () => {
+                    toast.classList.add("translate-x-full", "opacity-0");
+                    setTimeout(() => toast.remove(), 300);
+                };
+
+                // close button
+                toast.querySelector("button").onclick = removeToast;
+
+                // auto close
+                setTimeout(removeToast, duration);
+            }
+
+            // Helper: Format Waktu (MySQL DateTime Format)
+            function formatTime(timestamp) {
+                const date = new Date(timestamp);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                const seconds = String(date.getSeconds()).padStart(2, '0');
+                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+            }
+
+            // Helper: Update Relay Status (Data Changes)
+            function updateRelayStatus(isActive) {
+                const status = document.getElementById('relay-status');
+                const dot = document.getElementById('relay-dot');
+                const text = document.getElementById('relay-text');
+
+                showToast(`Status Relay ${isActive ? 'ON' : 'OFF'} Pada Jam ${formatTime(new Date())}`, isActive ? 'success' : 'error');
+                
+                if (isActive) {
+                    status.className = 'flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/20';
+                    dot.className = 'h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse';
+                    text.className = 'text-xs font-bold uppercase tracking-wider text-green-300';
+                    text.textContent = 'Online';
+                } else {
+                    status.className = 'flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/20';
+                    dot.className = 'h-1.5 w-1.5 rounded-full bg-red-400';
+                    text.className = 'text-xs font-bold uppercase tracking-wider text-red-300';
+                    text.textContent = 'Offline';
+                }
+
+                // Clear existing timeout
+                if (relayTimeout) clearTimeout(relayTimeout);
+
+                // Set timeout to mark as offline after 30 seconds
+                if (isActive) {
+                    relayTimeout = setTimeout(() => {
+                        updateRelayStatus(false);
+                    }, 30000);
+                }
+            }
+
+            // Helper: Update UI Indikator Koneksi (Header)
+            function updateConnectionIndicator(isOnline) {
+                const badge = document.getElementById('device-connection-badge');
+                const ping = document.getElementById('conn-ping');
+                const dot = document.getElementById('conn-dot');
+                const text = document.getElementById('conn-text');
+                showToast(`Device ${isOnline ? 'Connected' : 'Disconnected'} at ${formatTime(new Date())}`, isOnline ? 'success' : 'error');
+                if (isOnline) {
+                    badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-green-500/10 border-green-500/50 text-green-400";
+                    ping.classList.remove('hidden');
+                    ping.classList.add('animate-pulse-once', 'animate-ping');
+                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500";
+                    text.textContent = "Connected";
+                } else {
+                    badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-red-500/10 border-red-500/50 text-red-400";
+                    ping.classList.add('hidden');
+                    ping.classList.remove('animate-pulse-once', 'animate-ping');
+                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500";
+                    text.textContent = "Disconnected";
+                }
+            }
+
+            socket.on('connect', () => {
+                console.log('Browser connected to Socket Server');
+                socket.emit('join-device', deviceId);
+            });
+
+            // Event listener for device status (MQTT Connection)
+            socket.on(`${deviceId}/device-status`, (data) => {
+                console.log('Device status update:', data);
+
+                // 1. Update Indikator Koneksi (Header)
+                if (data.status) {
+                    const isOnline = (data.status === 'online');
+                    updateConnectionIndicator(isOnline);
+                }
+
+                // 2. Update Waktu (Heartbeat)
+                if (data.timestamp) {
+                    const timeEl = document.querySelector('[data-last-active]');
+                    if (timeEl) timeEl.textContent = formatTime(data.timestamp);
+                }
+            });
+
+            // Event listener for relay/value data changes
+            socket.on(`${deviceId}/value`, (data) => {
+                console.log('Device value update:', data);
+
+                updateRelayStatus(data.values.switch);
+
+                // Update last active
+                if (data.timestamp) {
+                    const timeEl = document.querySelector('[data-last-active]');
+                    if (timeEl) timeEl.textContent = formatTime(data.timestamp);
+                }
+            });
+
+            window.addEventListener('beforeunload', () => {
+                socket.emit('leave-device', deviceId);
+                if (relayTimeout) clearTimeout(relayTimeout);
+            });
+        </script>
+
+        <style>
+            /* Animasi kecil saat data berubah */
+            @keyframes highlight {
+                0% {
+                    background-color: rgba(59, 130, 246, 0.1);
+                }
+
+                100% {
+                    background-color: transparent;
+                }
+            }
+
+            .animate-pulse-once {
+                animation: highlight 1s ease-out;
+            }
+        </style>
+    </body>
+
+</html>

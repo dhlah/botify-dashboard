@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/header', { title: 'Device Page' }) %>
+
+    <body class="bg-gray-50 flex min-h-screen pt-3 sm:pt-5 px-3 sm:px-6">
+        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3"></div>
+        <main class="bg-white rounded-lg shadow-lg w-full max-w-6xl mx-auto overflow-hidden border border-gray-100">
+            <div
+                class="bg-slate-800 p-3 sm:p-6 text-white gap-3 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6">
+                <h1 class="text-2xl font-bold">Device List</h1>
+                <div class="flex gap-2">
+                    <button id="refresh-btn"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors duration-300">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+            </div>
+            <div class="px-3 sm:px-6 pb-4 sm:pb-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <% devices.forEach(device=> { %>
+                        <div
+                            class="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-300">
+                            <div class="flex items-center justify-between mb-2">
+                                <!-- device name with device status connection -->
+                                <h2 class="text-lg font-semibold text-gray-800">
+                                    <%= device.name %>
+                                </h2>
+                                <div id="device-connection-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 text-xs whitespace-nowrap
+                <%= (device.deviceState === 'online') 
+                    ? 'bg-green-500/10 border-green-500 text-green-400' 
+                    : 'bg-red-500/10 border-red-500/50 text-red-400' %>">
+                                    <div class="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                                        <span id="conn-ping"
+                                            class="<%= (device.deviceState === 'online') ? 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' : 'hidden' %>"></span>
+                                        <span id="conn-dot"
+                                            class="relative inline-flex rounded-full h-full w-full <%= (device.deviceState === 'online') ? 'bg-green-500' : 'bg-red-500' %>"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-600">ID: <%= device.id %>
+                            </p>
+                            <a href="/device/<%= device.id %>"
+                                class="mt-2 inline-block text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                View Details
+                            </a>
+                        </div>
+                        <% }); %>
+                </div>
+            </div>
+        </main>
+        <script>
+            const refreshBtn = document.getElementById('refresh-btn');
+            refreshBtn.addEventListener('click', () => {
+                location.reload();
+            });
+        </script>
+    </body>
+
+</html>

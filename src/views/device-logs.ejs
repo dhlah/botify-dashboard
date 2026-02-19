@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/header', { title: 'Device Logs Page' }) %>
+
+    <body class="bg-gray-50 flex min-h-screen pt-3 sm:pt-5 px-3 sm:px-6">
+        <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3"></div>
+        <main class="bg-white rounded-lg shadow-lg w-full max-w-6xl mx-auto overflow-hidden border border-gray-100">
+            <!-- Header Section with Connection Badge -->
+            <div class="bg-slate-800 p-3 sm:p-6 text-white gap-3 flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6">
+                <!-- Left Section -->
+                <!-- Back Button -->
+                <a href="/device/<%= deviceInfo.id %>"
+                    class="bg-slate-700 hover:bg-slate-600 transition px-3 py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-semibold">
+                    ← Kembali
+                </a>
+                <div class="flex-1 flex items-center gap-4">
+                    <!-- Title -->
+                    <div class="flex-1">
+                        <h1 class="text-lg sm:text-2xl font-bold tracking-wide truncate">
+                            <%= deviceInfo.name %>
+                        </h1>
+                        <p class="text-slate-400 text-xs sm:text-sm font-mono mt-1 truncate">
+                            ID: #<%= deviceInfo.id %>
+                        </p>
+                    </div>
+                </div>
+                <!-- Connection Badge -->
+                <div id="device-connection-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 text-xs whitespace-nowrap
+                <%= (deviceInfo.deviceState === 'online') 
+                    ? 'bg-green-500/10 border-green-500 text-green-400' 
+                    : 'bg-red-500/10 border-red-500/50 text-red-400' %>">
+                    <div class="relative flex h-2 w-2 sm:h-2.5 sm:w-2.5">
+                        <span id="conn-ping"
+                            class="<%= (deviceInfo.deviceState === 'online') ? 'animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' : 'hidden' %>"></span>
+                        <span id="conn-dot"
+                            class="relative inline-flex rounded-full h-full w-full <%= (deviceInfo.deviceState === 'online') ? 'bg-green-500' : 'bg-red-500' %>"></span>
+                    </div>
+                    <span id="conn-text" class="text-xs font-bold uppercase tracking-wider hidden sm:inline">
+                        <%= (deviceInfo.deviceState==='online' ) ? 'Connected' : 'Disconnected' %>
+                    </span>
+                </div>
+            </div>
+
+            <div class="px-3 sm:px-6 pb-4 sm:pb-6">
+
+                <!-- Tab Navigation -->
+                <div class="border-b border-gray-200 mb-4 sm:mb-6 overflow-x-auto">
+                    <div class="flex space-x-4 sm:space-x-8 min-w-max sm:min-w-0">
+                        <button
+                            class="tab-btn active px-2 sm:px-4 py-3 border-b-2 border-blue-500 text-blue-600 font-semibold hover:text-blue-700 transition text-xs sm:text-base"
+                            data-tab="logs-tab">
+                            📊 Device Logs
+                        </button>
+                        <button
+                            class="tab-btn px-2 sm:px-4 py-3 border-b-2 border-transparent text-gray-600 font-semibold hover:text-gray-800 transition text-xs sm:text-base"
+                            data-tab="summary-tab">
+                            📈 Summary
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div id="logs-tab" class="tab-content active">
+                    <!-- Time Range Filter -->
+                    <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Pilih Rentang Waktu</h3>
+                        
+                        <!-- Mobile/Tablet Dropdown -->
+                        <div class="lg:hidden mb-3">
+                            <select id="mobileTimeRangeSelect" class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="10m">10 Menit</option>
+                                <option value="1h" selected>1 Jam</option>
+                                <option value="1d">1 Hari</option>
+                                <option value="1month">1 Bulan</option>
+                                <option value="1year">1 Tahun</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Desktop Buttons -->
+                        <div class="hidden lg:flex flex-wrap gap-2 mb-3">
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition font-medium text-xs sm:text-sm"
+                                data-range="10m">
+                                10 Menit
+                            </button>
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1h">
+                                1 Jam
+                            </button>
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1d">
+                                1 Hari
+                            </button>
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1month">
+                                1 Bulan
+                            </button>
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1year">
+                                1 Tahun
+                            </button>
+                            <button
+                                class="time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="custom">
+                                Custom
+                            </button>
+                        </div>
+
+                        <!-- Custom Range Input -->
+                        <div id="customRangeInputs" class="hidden mt-3 p-3 bg-white rounded border border-gray-300">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-600 block mb-1">Dari:</label>
+                                    <input type="datetime-local" id="startDate"
+                                        class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-600 block mb-1">Sampai:</label>
+                                    <input type="datetime-local" id="endDate"
+                                        class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="sm:col-span-2 lg:col-span-1 flex items-end">
+                                    <button id="applyCustomRange"
+                                        class="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-medium text-xs sm:text-sm">
+                                        Terapkan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Limit Control -->
+                        <div class="mt-3 sm:mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                            <label class="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">
+                                Jumlah Records:
+                                <select id="limitSelect"
+                                    class="ml-1 sm:ml-2 px-2 sm:px-3 py-1.5 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="10">10</option>
+                                    <option value="25">25</option>
+                                    <option value="50">50</option>
+                                    <option value="100" selected>100</option>
+                                </select>
+                            </label>
+                            <button id="refreshBtn"
+                                class="px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition font-medium text-xs sm:text-sm">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                        <div class="mt-2 text-xs sm:text-sm flex items-center gap-2 text-gray-700">
+                            <input type="checkbox" id="includeLogs" class="rounded">
+                            <label for="includeLogs" class="cursor-pointer">Tampilkan log perangkat</label>
+                        </div>
+                    </div>
+
+                    <!-- Loading Skeleton -->
+                    <div id="loadingSkeleton" class="mb-4 space-y-2 hidden">
+                        <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                            <table class="min-w-full bg-white">
+                                <thead class="bg-gray-100 border-b border-gray-200">
+                                    <tr>
+                                        <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">No</th>
+                                        <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Timestamp</th>
+                                        <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Status</th>
+                                        <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% for (let i = 0; i < 5; i++) { %>
+                                    <tr class="border-b border-gray-200">
+                                        <td class="py-2 sm:py-3 px-2 sm:px-4">
+                                            <div class="h-4 bg-gray-300 rounded animate-pulse"></div>
+                                        </td>
+                                        <td class="py-2 sm:py-3 px-2 sm:px-4">
+                                            <div class="h-4 bg-gray-300 rounded animate-pulse"></div>
+                                        </td>
+                                        <td class="py-2 sm:py-3 px-2 sm:px-4">
+                                            <div class="h-4 bg-gray-300 rounded animate-pulse w-12"></div>
+                                        </td>
+                                        <td class="py-2 sm:py-3 px-2 sm:px-4">
+                                            <div class="h-4 bg-gray-300 rounded animate-pulse w-8"></div>
+                                        </td>
+                                    </tr>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Logs Table -->
+                    <div id="logsContainer" class="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-gray-100 border-b border-gray-200 sticky top-0">
+                                <tr>
+                                    <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">No</th>
+                                    <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Timestamp</th>
+                                    <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Status</th>
+                                    <th class="py-2 sm:py-3 px-2 sm:px-4 text-left text-xs sm:text-sm font-semibold text-gray-700">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody">
+                                <!-- Will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="emptyState" class="hidden text-center py-12">
+                        <svg class="w-12 sm:w-16 h-12 sm:h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                            </path>
+                        </svg>
+                        <p class="text-gray-500 font-medium text-xs sm:text-base">Tidak ada data log untuk periode ini</p>
+                    </div>
+                </div>
+
+                <!-- Summary Tab -->
+                <div id="summary-tab" class="tab-content hidden">
+                    <!-- Summary Time Range Selector -->
+                    <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Pilih Rentang Waktu untuk Summary</h3>
+                        
+                        <!-- Mobile/Tablet Dropdown -->
+                        <div class="lg:hidden mb-3">
+                            <select id="mobileSummaryTimeRangeSelect" class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="1h" selected>1 Jam</option>
+                                <option value="1d">1 Hari</option>
+                                <option value="1month">1 Bulan</option>
+                                <option value="1year">1 Tahun</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Desktop Buttons -->
+                        <div class="hidden lg:flex flex-wrap gap-2 mb-3">
+                            <button
+                                class="summary-time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition font-medium text-xs sm:text-sm"
+                                data-range="1h">
+                                1 Jam
+                            </button>
+                            <button
+                                class="summary-time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1d">
+                                1 Hari
+                            </button>
+                            <button
+                                class="summary-time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1month">
+                                1 Bulan
+                            </button>
+                            <button
+                                class="summary-time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="1year">
+                                1 Tahun
+                            </button>
+                            <button
+                                class="summary-time-range-btn px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition font-medium text-xs sm:text-sm"
+                                data-range="custom">
+                                Custom
+                            </button>
+                        </div>
+
+                        <!-- Custom Range Input for Summary -->
+                        <div id="summaryCustomRangeInputs" class="hidden mt-3 p-3 bg-white rounded border border-gray-300">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-600 block mb-1">Dari:</label>
+                                    <input type="datetime-local" id="summaryStartDate"
+                                        class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-semibold text-gray-600 block mb-1">Sampai:</label>
+                                    <input type="datetime-local" id="summaryEndDate"
+                                        class="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div class="sm:col-span-2 lg:col-span-1 flex items-end">
+                                    <button id="applySummaryCustomRange"
+                                        class="w-full px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition font-medium text-xs sm:text-sm">
+                                        Terapkan
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Summary Loading Skeleton -->
+                    <div id="summarySkeleton" class="hidden">
+                        <!-- Stats Cards Skeleton -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 mb-4 sm:mb-6">
+                            <div class="bg-gray-200 rounded-lg p-3 sm:p-6 h-24 sm:h-32 animate-pulse"></div>
+                            <div class="bg-gray-200 rounded-lg p-3 sm:p-6 h-24 sm:h-32 animate-pulse"></div>
+                        </div>
+
+                        <!-- Overall Stats Skeleton -->
+                        <div class="bg-gray-200 rounded-lg p-3 sm:p-6 h-20 sm:h-28 animate-pulse"></div>
+                    </div>
+
+                    <!-- Summary Content -->
+                    <div id="summaryContent">
+                        <!-- Real-time Current Status -->
+                        <div class="mb-4 sm:mb-6 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 sm:p-6 border border-blue-300">
+                            <h3 class="text-xs sm:text-sm font-semibold text-blue-800 mb-4">⏱️ Status Real-Time</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="bg-white rounded-lg p-4 border border-blue-200">
+                                    <p class="text-xs text-blue-600 font-medium mb-2">Current Status</p>
+                                    <div class="flex items-center gap-3">
+                                        <span id="currentStatusIcon" class="text-3xl">📊</span>
+                                        <h3 id="currentStatusText" class="text-2xl sm:text-3xl font-bold text-blue-700">--</h3>
+                                    </div>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-blue-200">
+                                    <p class="text-xs text-blue-600 font-medium mb-2">Duration Since Status Change</p>
+                                    <p id="statusDurationTimer" class="text-2xl sm:text-3xl font-bold font-mono text-blue-700">00:00:00</p>
+                                    <p id="statusChangeTime" class="text-xs text-blue-600 mt-2">Changed at --:--:--</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6">
+                            <!-- Summary Stats Cards -->
+                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 sm:p-6 border border-green-200">
+                                <h3 class="text-xs sm:text-sm font-semibold text-green-800 mb-2">🟢 Status ON (Menyala)</h3>
+                                <div class="flex items-end justify-between gap-3">
+                                    <div class="flex-1">
+                                        <p class="text-2xl sm:text-3xl font-bold text-green-600" id="onCount">0</p>
+                                        <p class="text-xs text-green-700 mt-1">Jumlah: <span id="onPercentage">0</span>%</p>
+                                    </div>
+                                    <div class="text-3xl sm:text-4xl flex-shrink-0">🟢</div>
+                                </div>
+                                <p class="text-xs text-green-700 mt-3">Durasi: <span id="onDuration" class="font-semibold">0 menit</span></p>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-3 sm:p-6 border border-red-200">
+                                <h3 class="text-xs sm:text-sm font-semibold text-red-800 mb-2">🔴 Status OFF (Mati)</h3>
+                                <div class="flex items-end justify-between gap-3">
+                                    <div class="flex-1">
+                                        <p class="text-2xl sm:text-3xl font-bold text-red-600" id="offCount">0</p>
+                                        <p class="text-xs text-red-700 mt-1">Jumlah: <span id="offPercentage">0</span>%</p>
+                                    </div>
+                                    <div class="text-3xl sm:text-4xl flex-shrink-0">🔴</div>
+                                </div>
+                                <p class="text-xs text-red-700 mt-3">Durasi: <span id="offDuration" class="font-semibold">0 menit</span></p>
+                            </div>
+                        </div>
+
+                        <!-- Overall Stats -->
+                        <div class="mt-4 sm:mt-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg p-3 sm:p-6 border border-slate-300">
+                            <h3 class="text-base sm:text-lg font-semibold text-slate-800 mb-3 sm:mb-4">📊 Statistik Overall</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                                <div class="p-2 sm:p-3 bg-white rounded border border-slate-200">
+                                    <p class="text-xs text-slate-700 font-medium">Total Records</p>
+                                    <p class="text-xl sm:text-2xl font-bold text-slate-600" id="totalRecords">0</p>
+                                </div>
+                                <div class="p-2 sm:p-3 bg-white rounded border border-slate-200">
+                                    <p class="text-xs text-slate-700 font-medium">Uptime %</p>
+                                    <p class="text-xl sm:text-2xl font-bold text-green-600" id="uptimePercentage">0%</p>
+                                </div>
+                                <div class="p-2 sm:p-3 bg-white rounded border border-slate-200">
+                                    <p class="text-xs text-slate-700 font-medium">Downtime %</p>
+                                    <p class="text-xl sm:text-2xl font-bold text-red-600" id="downtimePercentage">0%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </main>
+
+        <!-- Socket.IO Client -->
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            // Initialize variables
+            let currentTimeRange = '<%= timeRange %>' || '1h';
+            let currentSummaryTimeRange = '1h';
+            let currentLimit = 100;
+            let logsData = [];
+            const deviceId = '<%= deviceInfo.id %>';
+            let deviceConnected = true;
+            
+            // Real-time status tracking
+            let lastStatus = null;
+            let lastStatusChangeTime = null;
+            let statusUpdateInterval = null;
+
+            // Initialize Socket.IO
+            const socket = io();
+
+            // Join logs room
+            socket.emit('join-device-logs', deviceId);
+            socket.emit('join-device', deviceId);
+
+            // Format time duration to HH:MM:SS
+            function formatDuration(seconds) {
+                const hours = Math.floor(seconds / 3600);
+                const minutes = Math.floor((seconds % 3600) / 60);
+                const secs = seconds % 60;
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+
+            // Update real-time status display
+            function updateStatusDisplay() {
+                if (!lastStatusChangeTime) return;
+                
+                const now = new Date().getTime();
+                const changeTime = new Date(lastStatusChangeTime).getTime();
+                const secondsElapsed = Math.floor((now - changeTime) / 1000);
+                
+                document.getElementById('statusDurationTimer').textContent = formatDuration(secondsElapsed);
+                
+                const changeTimeObj = new Date(lastStatusChangeTime);
+                const timeString = changeTimeObj.toLocaleTimeString('id-ID');
+                document.getElementById('statusChangeTime').textContent = `Changed at ${timeString}`;
+            }
+
+            // Update current status in real-time
+            function updateCurrentStatus(status) {
+                if (status === null || status === undefined) return;
+                if (status !== 1 && status !== 0) return; // Only handle known statuses
+                const statusNum = Number(status);
+                let statusText = '';
+                let statusIcon = '';
+                let statusClass = '';
+                
+                if (statusNum === 1) {
+                    statusText = 'ON';
+                    statusIcon = '🟢';
+                    statusClass = 'text-green-700';
+                } else if (statusNum === 0) {
+                    statusText = 'OFF';
+                    statusIcon = '🔴';
+                    statusClass = 'text-red-700';
+                } else {
+                    statusText = 'UNKNOWN';
+                    statusIcon = '⚪';
+                    statusClass = 'text-gray-700';
+                }
+                
+                document.getElementById('currentStatusText').textContent = statusText;
+                document.getElementById('currentStatusText').className = `text-2xl sm:text-3xl font-bold ${statusClass}`;
+                document.getElementById('currentStatusIcon').textContent = statusIcon;
+                
+                lastStatus = statusNum;
+            }
+
+            // Start the real-time timer
+            function startStatusTimer() {
+                if (statusUpdateInterval) {
+                    clearInterval(statusUpdateInterval);
+                }
+                updateStatusDisplay();
+                statusUpdateInterval = setInterval(updateStatusDisplay, 1000);
+            }
+
+            function showToast(message, type = "info", duration = 3000) {
+                const colors = {
+                    success: "bg-green-500",
+                    error: "bg-red-500",
+                    info: "bg-blue-500",
+                    warning: "bg-yellow-500"
+                };
+
+                const toast = document.createElement("div");
+                toast.className = `
+                    ${colors[type] || colors.info}
+                    text-white px-4 py-3 rounded-xl shadow-lg
+                    transform translate-x-full opacity-0
+                    transition-all duration-300 ease-in-out
+                    flex items-center gap-2 min-w-[220px]
+                `;
+
+                toast.innerHTML = `
+                    <span class="flex-1">${message}</span>
+                    <button class="opacity-70 hover:opacity-100">✕</button>
+                `;
+                document.getElementById("toast-container").appendChild(toast);
+
+                // animate in
+                setTimeout(() => {
+                    toast.className = toast.className.replace("translate-x-full", "").replace("opacity-0", "");
+                }, 10);
+
+                // close function
+                const removeToast = () => {
+                    toast.className += " translate-x-full opacity-0";
+                    setTimeout(() => toast.remove(), 300);
+                };
+
+                // close button
+                toast.querySelector("button").onclick = removeToast;
+
+                // auto close
+                setTimeout(removeToast, duration);
+            }
+
+            // Update connection badge status
+            function updateConnectionBadge(isOnline) {
+                console.log(`Updating connection badge. Device is now ${isOnline ? 'online' : 'offline'}.`);
+                const badge = document.getElementById('device-connection-badge');
+                const ping = document.getElementById('conn-ping');
+                const dot = document.getElementById('conn-dot');
+                const text = document.getElementById('conn-text');
+                showToast(`Perangkat Sedang ${isOnline ? 'online' : 'offline'}`, isOnline ? 'success' : 'error');
+                deviceConnected = isOnline;
+
+                if (isOnline) {
+                    badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-green-500/10 border-green-500/50 text-green-400";
+                    ping.classList.remove('hidden');
+                    ping.classList.add('animate-pulse-once', 'animate-ping');
+                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500";
+                    text.textContent = "Connected";
+                } else {
+                    badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-red-500/10 border-red-500/50 text-red-400";
+                    ping.classList.add('hidden');
+                    ping.classList.remove('animate-pulse-once', 'animate-ping');
+                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500";
+                    text.textContent = "Disconnected";
+                }
+            }
+
+            // Listen to device connection status
+            socket.on(`${deviceId}/device-status`, (data) => {
+                // 1. Update Indikator Koneksi (Header)
+                if (data.status) {
+                    const isOnline = (data.status === 'online');
+                    updateConnectionBadge(isOnline);
+                }
+            });
+
+
+            // Tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const tabName = this.getAttribute('data-tab');
+
+                    document.querySelectorAll('.tab-content').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.querySelectorAll('.tab-btn').forEach(b => {
+                        b.classList.remove('border-blue-500', 'text-blue-600');
+                        b.classList.add('border-transparent', 'text-gray-600');
+                    });
+
+                    document.getElementById(tabName).classList.remove('hidden');
+                    this.classList.remove('border-transparent', 'text-gray-600');
+                    this.classList.add('border-blue-500', 'text-blue-600');
+
+                    // Load summary when switching to summary tab
+                    if (tabName === 'summary-tab') {
+                        // Load logs for the summary time range first to get current status
+                        await loadLogs(currentSummaryTimeRange);
+                        loadSummary(currentSummaryTimeRange);
+                    } else {
+                        // Stop timer when leaving summary tab
+                        if (statusUpdateInterval) {
+                            clearInterval(statusUpdateInterval);
+                            statusUpdateInterval = null;
+                        }
+                    }
+                });
+            });
+
+            // Time range selection for logs
+            document.querySelectorAll('.time-range-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const range = this.getAttribute('data-range');
+
+                    if (range === 'custom') {
+                        document.getElementById('customRangeInputs').classList.remove('hidden');
+                    } else {
+                        document.getElementById('customRangeInputs').classList.add('hidden');
+                        loadLogs(range);
+                    }
+
+                    // Update button styles
+                    document.querySelectorAll('.time-range-btn').forEach(b => {
+                        b.classList.remove('bg-blue-500', 'text-white');
+                        b.classList.add('bg-gray-200', 'text-gray-800');
+                    });
+                    if (range !== 'custom') {
+                        this.classList.remove('bg-gray-200', 'text-gray-800');
+                        this.classList.add('bg-blue-500', 'text-white');
+                    }
+                });
+            });
+
+            // Mobile time range dropdown
+            document.getElementById('mobileTimeRangeSelect').addEventListener('change', function () {
+                const range = this.value;
+                
+                if (range === 'custom') {
+                    document.getElementById('customRangeInputs').classList.remove('hidden');
+                } else {
+                    document.getElementById('customRangeInputs').classList.add('hidden');
+                    loadLogs(range);
+                }
+            });
+
+            // Summary time range buttons
+            document.querySelectorAll('.summary-time-range-btn').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const range = this.getAttribute('data-range');
+
+                    if (range === 'custom') {
+                        document.getElementById('summaryCustomRangeInputs').classList.remove('hidden');
+                    } else {
+                        document.getElementById('summaryCustomRangeInputs').classList.add('hidden');
+                        currentSummaryTimeRange = range;
+                        // Load logs first to get current status
+                        await loadLogs(range);
+                        loadSummary(range);
+                    }
+
+                    // Update button styles
+                    document.querySelectorAll('.summary-time-range-btn').forEach(b => {
+                        b.classList.remove('bg-blue-500', 'text-white');
+                        b.classList.add('bg-gray-200', 'text-gray-800');
+                    });
+                    if (range !== 'custom') {
+                        this.classList.remove('bg-gray-200', 'text-gray-800');
+                        this.classList.add('bg-blue-500', 'text-white');
+                    }
+                });
+            });
+
+            // Mobile summary time range dropdown
+            document.getElementById('mobileSummaryTimeRangeSelect').addEventListener('change', async function () {
+                const range = this.value;
+                
+                if (range === 'custom') {
+                    document.getElementById('summaryCustomRangeInputs').classList.remove('hidden');
+                } else {
+                    document.getElementById('summaryCustomRangeInputs').classList.add('hidden');
+                    currentSummaryTimeRange = range;
+                    // Load logs first to get current status
+                    await loadLogs(range);
+                    loadSummary(range);
+                }
+            });
+
+            // Apply summary custom range
+            document.getElementById('applySummaryCustomRange').addEventListener('click', async function () {
+                const startDate = document.getElementById('summaryStartDate').value;
+                const endDate = document.getElementById('summaryEndDate').value;
+
+                if (!startDate || !endDate) {
+                    alert('Silakan pilih tanggal awal dan akhir');
+                    return;
+                }
+
+                // Load logs first to get current status
+                await loadLogs('custom', startDate, endDate);
+                loadSummary('custom', startDate, endDate);
+                document.querySelectorAll('.summary-time-range-btn').forEach(b => {
+                    b.classList.remove('bg-blue-500', 'text-white');
+                    b.classList.add('bg-gray-200', 'text-gray-800');
+                });
+                document.querySelector('[data-range="custom"]').classList.remove('bg-gray-200', 'text-gray-800');
+                document.querySelector('[data-range="custom"]').classList.add('bg-blue-500', 'text-white');
+            });
+
+            // Apply custom range
+            document.getElementById('applyCustomRange').addEventListener('click', function () {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                if (!startDate || !endDate) {
+                    alert('Silakan pilih tanggal awal dan akhir');
+                    return;
+                }
+
+                loadLogs('custom', startDate, endDate);
+                document.querySelectorAll('.time-range-btn').forEach(b => {
+                    b.classList.remove('bg-blue-500', 'text-white');
+                    b.classList.add('bg-gray-200', 'text-gray-800');
+                });
+                document.querySelector('[data-range="custom"]').classList.remove('bg-gray-200', 'text-gray-800');
+                document.querySelector('[data-range="custom"]').classList.add('bg-blue-500', 'text-white');
+            });
+
+            // Limit select
+            document.getElementById('limitSelect').addEventListener('change', function () {
+                currentLimit = parseInt(this.value);
+                loadLogs(currentTimeRange);
+            });
+
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', function () {
+                loadLogs(currentTimeRange);
+            });
+
+            // Include logs checkbox
+            document.getElementById('includeLogs').addEventListener('change', function () {
+                renderLogsTable();
+                const message = this.checked
+                    ? 'Menampilkan semua histori perangkat'
+                    : 'Menampilkan hanya data relay (ON/OFF)';
+                showToast(message, 'info');
+            });
+
+            // Load logs with time range
+            async function loadLogs(timeRange, startDate = null, endDate = null) {
+                currentTimeRange = timeRange;
+                showLoading(true);
+
+                try {
+                    const params = new URLSearchParams({
+                        timeRange: timeRange,
+                        limit: currentLimit,
+                        ...(startDate && { startDate }),
+                        ...(endDate && { endDate })
+                    });
+
+                    const response = await fetch(`/api/device/${deviceId}/logs?${params}`);
+                    const data = await response.json();
+
+                    if (data.success) {
+                        logsData = data.logs;
+                        renderLogsTable();
+                        showLoading(false);
+                    }
+                } catch (error) {
+                    console.error('Error loading logs:', error);
+                    showToast('Gagal mengambil data log', 'error');
+                    showLoading(false);
+                }
+            }
+
+            // Load summary
+            async function loadSummary(timeRange, startDate = null, endDate = null) {
+                try {
+                    showSummarySkeleton(true);
+                    console.log('Loading summary for timeRange:', timeRange);
+
+                    const params = new URLSearchParams({
+                        timeRange: timeRange,
+                        ...(startDate && { startDate }),
+                        ...(endDate && { endDate })
+                    });
+
+                    const response = await fetch(`/api/device/${deviceId}/summary?${params}`);
+                    const data = await response.json();
+
+                    console.log('Summary response:', data);
+
+                    if (data.success && data.summary) {
+                        const summary = data.summary;
+
+                        console.log('Summary data:', summary);
+                        updateCurrentStatus(summary.lastValue);
+                        document.getElementById('onCount').textContent = summary.onCount;
+                        document.getElementById('offCount').textContent = summary.offCount;
+                        document.getElementById('onPercentage').textContent = summary.onPercentage;
+                        document.getElementById('offPercentage').textContent = summary.offPercentage;
+                        document.getElementById('onDuration').textContent = summary.totalOnDurationMinutes + ' menit';
+                        document.getElementById('offDuration').textContent = summary.totalOffDurationMinutes + ' menit';
+
+                        document.getElementById('totalRecords').textContent = summary.totalRecords;
+                        document.getElementById('uptimePercentage').textContent = parseFloat(summary.onPercentage).toFixed(2) + '%';
+                        document.getElementById('downtimePercentage').textContent = parseFloat(summary.offPercentage).toFixed(2) + '%';
+                        
+                        // Update real-time status from latest log
+                        if (logsData && logsData.length > 0) {
+                            const latestLog = logsData[0];
+                            updateCurrentStatus(latestLog.value);
+                            lastStatusChangeTime = latestLog.timestamp;
+                            startStatusTimer();
+                        }
+                        
+                        showSummarySkeleton(false);
+                    } else {
+                        console.error('Invalid summary response:', data);
+                        showSummarySkeleton(false);
+                    }
+                } catch (error) {
+                    console.error('Error loading summary:', error);
+                    showSummarySkeleton(false);
+                }
+            }
+
+            function renderLogsTable() {
+                const tbody = document.getElementById('logsTableBody');
+                const emptyState = document.getElementById('emptyState');
+                const includeLogsCheckbox = document.getElementById('includeLogs');
+
+                if (!logsData || logsData.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+
+                    if (!renderLogsTable._toastShown) {
+                        showToast('Tidak ada data log untuk periode ini', 'info');
+                        renderLogsTable._toastShown = true;
+                    }
+                    return;
+                }
+
+                renderLogsTable._toastShown = false;
+                emptyState.classList.add('hidden');
+
+                // filter data
+                const filteredLogs = logsData.filter(log => {
+                    if (includeLogsCheckbox.checked) return true;
+                    return Number(log.value) === 1 || Number(log.value) === 0;
+                });
+
+                tbody.innerHTML = filteredLogs.map((log, index) => {
+                    const timestamp = new Date(log.timestamp);
+                    const valueNum = Number(log.value);
+
+                    const status =
+                        valueNum === 1 ? '🟢 ON' :
+                            valueNum === 0 ? '🔴 OFF' :
+                                '📝 Logs';
+
+                    const statusColor =
+                        valueNum === 1 ? 'text-green-600' :
+                            valueNum === 0 ? 'text-red-600' :
+                                'text-gray-600';
+
+                    const highlight =
+                        includeLogsCheckbox.checked && (valueNum !== 0 && valueNum !== 1)
+                            ? 'bg-blue-50'
+                            : '';
+
+                    return `
+            <tr class="${highlight} border-b border-gray-200 hover:bg-gray-50 transition">
+                <td class="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">${filteredLogs.length - index}</td>
+                <td class="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">${timestamp.toLocaleString('id-ID')}</td>
+                <td class="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold ${statusColor}">${status}</td>
+                <td class="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-800 font-mono">${log.value}</td>
+            </tr>
+        `;
+                }).join('');
+            }
+
+            // Show/Hide loading skeleton
+            function showLoading(show) {
+                const skeleton = document.getElementById('loadingSkeleton');
+                const empty = document.getElementById('emptyState');
+                const container = document.getElementById('logsContainer');
+                if (show) {
+                    skeleton.classList.remove('hidden');
+                    empty.classList.add('hidden');
+                    container.classList.add('hidden');
+                } else {
+                    skeleton.classList.add('hidden');
+                    container.classList.remove('hidden');
+                }
+            }
+
+            // Show/Hide summary loading skeleton
+            function showSummarySkeleton(show) {
+                const skeleton = document.getElementById('summarySkeleton');
+                const content = document.getElementById('summaryContent');
+                if (show) {
+                    skeleton.classList.remove('hidden');
+                    content.classList.add('hidden');
+                } else {
+                    skeleton.classList.add('hidden');
+                    content.classList.remove('hidden');
+                }
+            }
+
+            // Real-time update listener
+            socket.on(`${deviceId}/new-log`, function (data) {
+                // Add new log to the beginning of the array
+                logsData.unshift({
+                    value: data.value,
+                    timestamp: data.timestamp
+                });
+
+                // Keep only the latest records based on current limit
+                logsData = logsData.slice(0, currentLimit);
+
+                // Re-render table
+                renderLogsTable();
+
+                // Update real-time status display if summary is visible
+                const summaryTab = document.getElementById('summary-tab');
+                if (!summaryTab.classList.contains('hidden')) {
+                    updateCurrentStatus(data.value);
+                    lastStatusChangeTime = data.timestamp;
+                    startStatusTimer();
+                }
+
+                // Show a notification
+                console.log('New log received:', data);
+                if (data.value == 1 || data.value == 0) {
+                    showToast(`Data Baru: ${data.value == 1 ? 'Relay ON' : data.value == 0 ? 'Relay OFF' : data.value} saat ${new Date(data.timestamp).toLocaleTimeString('id-ID')}`, 'info');
+                }
+            });
+
+            // Initial render
+            document.addEventListener('DOMContentLoaded', function () {
+                // Load initial logs data
+                loadLogs('1h');
+            });
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', function () {
+                socket.emit('leave-device-logs', deviceId);
+                socket.emit('leave-device', deviceId);
+                if (statusUpdateInterval) {
+                    clearInterval(statusUpdateInterval);
+                }
+            });
+        </script>
+
+        <!-- Custom Styles for Responsive Design -->
+        <style>
+            /* Smooth animations for loading skeleton */
+            @keyframes shimmer {
+                0% {
+                    background-position: -1000px 0;
+                }
+                100% {
+                    background-position: 1000px 0;
+                }
+            }
+
+            .animate-pulse {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: .5;
+                }
+            }
+
+            /* Mobile responsive adjustments */
+            @media (max-width: 640px) {
+                body {
+                    font-size: 14px;
+                }
+
+                table {
+                    font-size: 12px;
+                }
+
+                .px-6 {
+                    padding-left: 0.75rem;
+                    padding-right: 0.75rem;
+                }
+            }
+
+            /* Sticky header for better scrolling experience */
+            thead th {
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            /* Responsive button sizing */
+            @media (max-width: 640px) {
+                button {
+                    font-size: 0.875rem;
+                }
+            }
+
+            /* Ensure proper spacing on mobile */
+            @media (max-width: 768px) {
+                .gap-6 {
+                    gap: 1rem;
+                }
+
+                .space-x-8 > :not([hidden]) ~ :not([hidden]) {
+                    margin-left: 0.5rem;
+                }
+            }
+        </style>
+        </div>
+        </main>
+    </body>
+
+</html>
