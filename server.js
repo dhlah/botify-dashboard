@@ -1,18 +1,18 @@
 import express from 'express';
 import { createServer } from 'node:http';
-import logger from './lib/logger/logger.js';
-import { deviceMonitor, systemMonitor } from './lib/logger/index.js';
+import logger from './src/lib/logger/logger.js';
+import { deviceMonitor, systemMonitor } from './src/lib/logger/index.js';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
-import { startBroker, setSocketIO } from './broker.js';
-import deviceRoutes from './routes/deviceRoutes.js';
+import { startBroker, setSocketIO } from './src/broker.js';
+import deviceRoutes from './src/routes/deviceRoutes.js';
 import bodyParser from 'body-parser';
 import os from 'os';
-import testConnectionToTelegram from './services/testing-telegram-connection.js';
-import CLIHandler from './lib/cli/cli-handler.js';
-import getAllDevices from './functions/get-all-device.js';
+import testConnectionToTelegram from './src/services/testing-telegram-connection.js';
+import CLIHandler from './src/lib/cli/cli-handler.js';
+import getAllDevices from './src/functions/get-all-device.js';
 
 dotenv.config();
 
