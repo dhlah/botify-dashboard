@@ -36,13 +36,13 @@ router.get('/device/:id', async (req, res) => {
         return res.status(404).send('Device not found');
     }
 
-    const lastValue = await getLogValueDevice(deviceId, 1); // Assume this function is defined elsewhere
-
+    const lastFiveValue = await getLogValueDevice(deviceId, 5); // Assume this function is defined elsewhere
+    const lastValue = lastFiveValue.filter(item => item.value !== 'online' && item.value !== 'offline')[0]
 
     res.render('device.ejs', {
         deviceId,
         deviceInfo,
-        lastValue: lastValue[0] || null,
+        lastValue: lastValue || null,
         formatTime
     });
 });
