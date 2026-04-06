@@ -4,6 +4,7 @@ import getDeviceInfo from '../functions/get-device-info.js';
 import getLogValueDevice from '../functions/get-log-value-device.js';
 import { getLogValueDeviceByRange, getLogValueDeviceSummary } from '../functions/get-log-value-device-by-range.js';
 import getAllDevices from '../functions/get-all-device.js';
+import { getInformationProviders } from '../functions/get-information-providers.js';
 
 const router = express.Router();
 
@@ -17,6 +18,10 @@ function formatTime(timestamp) {
     const seconds = String(date.getSeconds()).padStart(2, '0');
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
+
+router.get('/', (req, res) => {
+    res.redirect('/device');
+});
 
 router.get('/device', async (req, res) => {
     logger.debug('Received request for device list');
@@ -144,5 +149,26 @@ router.get('/api/device/:id/summary', async (req, res) => {
     }
 });
 
+router.get('/api/kuota-providers-xl/:numberKey', async (req, res) => {
+    const numberKey = req.params.numberKey;
+    try {
+        const providers = await getInformationProviders(numberKey);
+        res.json({
+            success: true,
+            numberKey,
+            providers
+        });
+    } catch (error) {
+        logger.error(`Error fetching information providers for ${numberKey}: ${error.message}`);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+router.use((req, res) => {
+    res.status(404).render('not-found.ejs');
+});
 
 export default router;

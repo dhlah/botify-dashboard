@@ -14,6 +14,9 @@ const aedes = Aedes();
 const AedesServer = createServer(aedes.handle);
 let io = null;
 
+// Store device IP addresses when clients connect
+const deviceIpMap = new Map();
+
 // Helper: Format datetime to MySQL format (YYYY-MM-DD HH:MM:SS)
 function formatMySQLDateTime(date = new Date()) {
     const year = date.getFullYear();
@@ -35,6 +38,24 @@ aedes.authenticate = (client, username, password, callback) => {
         callback(err, false);
     });
 };
+
+// Track device client connections and capture IP address
+aedes.on('client', (client) => {
+    if (client && client.id) {
+        // Get IP from socket.remoteAddress or fallback to 0.0.0.0
+        const deviceIp = client.conn?.remoteAddress || '0.0.0.0';
+        deviceIpMap.set(client.id, deviceIp);
+        logger.debug(`Device ${client.id} connected from IP: ${deviceIp}`, "MQTT-CLIENT");
+    }
+});
+
+// Clean up device IP on disconnect
+aedes.on('clientDisconnect', (client) => {
+    if (client && client.id) {
+        deviceIpMap.delete(client.id);
+        logger.debug(`Device ${client.id} disconnected and IP removed`, "MQTT-CLIENT");
+    }
+});
 
 async function pingDeviceStatus(clientId, status, timestamp = null) {
     if (status === 'offline') {
@@ -87,6 +108,25 @@ aedes.on('publish', async (packet, client) => {
     }
 
     if (packet.topic === `${clientId}/heartbeat`) {
+        // Handle heartbeat message (contains temperature from ESP)
+        logger.debug(`Heartbeat from ${clientId}: ${packet.payload.toString()}`, "MQTT-HEARTBEAT");
+        
+        try {
+            const temperature = parseFloat(packet.payload.toString());
+            const deviceIp = deviceIpMap.get(clientId) || 'Unknown';
+            
+            if (io) {
+                io.to(`${clientId}/status`).emit(`${clientId}/heartbeat`, {
+                    deviceId: clientId,
+                    temperature: temperature,
+                    deviceIp: deviceIp,
+                    timestamp: new Date()
+                });
+                logger.debug(`Emitted heartbeat to ${clientId}: temp=${temperature}°C, ip=${deviceIp}`, "MQTT-HEARTBEAT");
+            }
+        } catch (err) {
+            logger.warn(`Failed to parse heartbeat temperature for ${clientId}:`, err.message);
+        }
         return;
     }
 

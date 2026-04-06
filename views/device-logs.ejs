@@ -56,6 +56,13 @@
                             data-tab="summary-tab">
                             📈 Summary
                         </button>
+                        <% if (deviceInfo.phonenumber) { %>
+                            <button
+                                class="tab-btn px-2 sm:px-4 py-3 border-b-2 border-transparent text-gray-600 font-semibold hover:text-gray-800 transition text-xs sm:text-base"
+                                data-tab="information-tab">
+                                📞 Information
+                            </button>
+                        <% } %>
                     </div>
                 </div>
 
@@ -368,6 +375,18 @@
                         </div>
                     </div>
                 </div>
+                <% if (deviceInfo.phonenumber) { %>
+                    <div id="information-tab" class="tab-content hidden">
+                        <div class="mb-4 sm:mb-6 p-3 sm:p-4 bg-gray-50 rounded-lg">
+                            <h3 class="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">Informasi Nomor Telepon</h3>
+                            <p class="text-sm text-gray-600 mt-2">Phone Number: <%= deviceInfo.phonenumber %></p>
+                            <div id="numberInfoContainer">
+                                <!-- Number information will be loaded here -->
+ 
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
         </main>
 
         <!-- Socket.IO Client -->
@@ -379,6 +398,10 @@
             let currentLimit = 100;
             let logsData = [];
             const deviceId = '<%= deviceInfo.id %>';
+            // eslint-disable-next-line no-undef
+            const deviceInfo = <%- JSON.stringify(deviceInfo) %>;
+            console.log('Device Info:', deviceInfo);
+            // const deviceInfo = JSON.parse(deviceInfoRaw);
             let deviceConnected = true;
             
             // Real-time status tracking
@@ -392,6 +415,8 @@
             // Join logs room
             socket.emit('join-device-logs', deviceId);
             socket.emit('join-device', deviceId);
+            
+            // Auto-reload number information every 30 seconds
 
             // Format time duration to HH:MM:SS
             function formatDuration(seconds) {
@@ -729,6 +754,124 @@
                 }
             }
 
+            // Show/Hide number info loading skeleton
+            function showNumberInfoSkeleton(show) {
+                const container = document.getElementById('numberInfoContainer');
+                if (show) {
+                    container.innerHTML = `
+                        <div class="mt-4 space-y-3">
+                            <div class="bg-white p-3 rounded border border-gray-200">
+                                <div class="h-3 bg-gray-200 rounded w-16 mb-2 animate-pulse"></div>
+                                <div class="h-4 bg-gray-300 rounded w-full animate-pulse"></div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                ${Array(6).fill(`
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <div class="h-3 bg-gray-200 rounded w-20 mb-2 animate-pulse"></div>
+                                        <div class="h-4 bg-gray-300 rounded w-full animate-pulse"></div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded border border-blue-200 mt-3">
+                                <div class="h-3 bg-blue-200 rounded w-24 mb-2 animate-pulse"></div>
+                                <div class="grid grid-cols-3 gap-2">
+                                    ${Array(3).fill(`
+                                        <div>
+                                            <div class="h-3 bg-gray-200 rounded w-12 mb-2 animate-pulse"></div>
+                                            <div class="h-4 bg-gray-300 rounded w-full animate-pulse"></div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            async function loadNumberInformation() {
+                try {
+                    showNumberInfoSkeleton(true);
+                    const response = await fetch(`/api/kuota-providers-xl/${deviceInfo.phonenumber}`);
+                    const data = await response.json();
+                    console.log('Number information response:', data);
+                    
+                    if (data.success && data.providers && data.providers.data) {
+                        const providerData = data.providers.data;
+                        const dataSp = providerData.data_sp;
+                        
+                        let html = `
+                            <div class="mt-4 space-y-3">
+                                <div class="bg-white p-3 rounded border border-gray-200">
+                                    <p class="text-xs font-semibold text-gray-600">MSISDN</p>
+                                    <p class="text-sm font-mono text-gray-800">${providerData.msisdn}</p>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Tipe Kartu</p>
+                                        <p class="text-sm text-gray-800">${dataSp.prefix?.value || '-'}</p>
+                                    </div>
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Status 4G</p>
+                                        <p class="text-sm text-gray-800">${dataSp.status_4g?.value || '-'}</p>
+                                    </div>
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Umur Kartu</p>
+                                        <p class="text-sm text-gray-800">${dataSp.active_card?.value || '-'}</p>
+                                    </div>
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Status Dukcapil</p>
+                                        <p class="text-sm text-gray-800">${dataSp.dukcapil?.value || '-'}</p>
+                                    </div>
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Masa Aktif</p>
+                                        <p class="text-sm text-gray-800">${dataSp.active_period?.value || '-'}</p>
+                                    </div>
+                                    <div class="bg-white p-3 rounded border border-gray-200">
+                                        <p class="text-xs font-semibold text-gray-600">Masa Berakhir Tenggang</p>
+                                        <p class="text-sm text-gray-800">${dataSp.grace_period?.value || '-'}</p>
+                                    </div>
+                                </div>
+                                <div class="bg-blue-50 p-3 rounded border border-blue-200 mt-3">
+                                    <p class="text-xs font-semibold text-blue-700 mb-2">Status Volte</p>
+                                    <div class="grid grid-cols-3 gap-2 text-xs">
+                                        <div>
+                                            <p class="text-gray-600">Device</p>
+                                            <p class="font-semibold ${dataSp.status_volte?.value?.device ? 'text-green-600' : 'text-red-600'}">${dataSp.status_volte?.value?.device ? '✓ Aktif' : '✕ Tidak'}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-gray-600">Area</p>
+                                            <p class="font-semibold ${dataSp.status_volte?.value?.area ? 'text-green-600' : 'text-red-600'}">${dataSp.status_volte?.value?.area ? '✓ Aktif' : '✕ Tidak'}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-gray-600">Simcard</p>
+                                            <p class="font-semibold ${dataSp.status_volte?.value?.simcard ? 'text-green-600' : 'text-red-600'}">${dataSp.status_volte?.value?.simcard ? '✓ Aktif' : '✕ Tidak'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                ${dataSp.quotas?.value?.length > 0 ? `
+                                    <div class="bg-gray-50 p-3 rounded border border-gray-200 mt-3">
+                                        <p class="text-xs font-semibold text-gray-700 mb-2">Paket Kuota</p>
+                                        <div class="space-y-2">
+                                            ${dataSp.quotas.value.map(quota => `
+                                                <div class="bg-white p-2 rounded text-xs">
+                                                    <p class="font-medium">${quota.name || 'Paket'}</p>
+                                                    <p class="text-gray-600">${quota.remaining || '0'} / ${quota.total || '0'}</p>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : `<div class="bg-yellow-50 p-3 rounded border border-yellow-200 text-xs text-yellow-800"><p>⚠️ Tidak ada paket yang aktif</p></div>`}
+                            </div>
+                        `;
+                        
+                        document.getElementById('numberInfoContainer').innerHTML = html;
+                    }
+                } catch (error) {
+                    console.error('Error loading number information:', error);
+                    document.getElementById('numberInfoContainer').innerHTML = '<p class="text-sm text-red-500">Gagal memuat informasi nomor</p>';
+                }
+            }
+
             // Load summary
             async function loadSummary(timeRange, startDate = null, endDate = null) {
                 try {
@@ -892,11 +1035,14 @@
                     showToast(`Data Baru: ${data.value == 1 ? 'Relay ON' : data.value == 0 ? 'Relay OFF' : data.value} saat ${new Date(data.timestamp).toLocaleTimeString('id-ID')}`, 'info');
                 }
             });
+            loadNumberInformation()
 
             // Initial render
             document.addEventListener('DOMContentLoaded', function () {
                 // Load initial logs data
                 loadLogs('1h');
+                // Start auto-refresh for number information
+                startNumberInfoAutoRefresh();
             });
 
             // Cleanup on page unload
@@ -905,6 +1051,9 @@
                 socket.emit('leave-device', deviceId);
                 if (statusUpdateInterval) {
                     clearInterval(statusUpdateInterval);
+                }
+                if (numberInfoInterval) {
+                    clearInterval(numberInfoInterval);
                 }
             });
         </script>

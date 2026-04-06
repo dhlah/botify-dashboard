@@ -79,10 +79,60 @@
                             <%= deviceInfo.version %>
                         </span>
                     </div>
+                </div>
 
+                <!-- Accordion: Device Information -->
+                <div class="border-t border-gray-100 mt-4 pt-4">
+                    <button id="accordion-btn" class="w-full flex justify-between items-center px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                        <span class="font-medium text-gray-700">📋 Debug</span>
+                        <svg id="accordion-icon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-500 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
 
+                    <!-- Serial Monitor Style Panel -->
+                    <div id="accordion-content" style="display:none;">
+                        <div class="mt-1 rounded-b-lg overflow-hidden border border-gray-800 shadow-inner">
+                            <!-- Terminal Header Bar -->
+                            <div class="bg-gray-900 px-3 py-2 flex items-center justify-between border-b border-gray-700">
+                                <div class="flex items-center gap-2">
+                                    <div class="flex gap-1.5">
+                                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                                    </div>
+                                    <span class="text-gray-400 text-xs font-mono ml-2">Serial Monitor — 115200 baud</span>
+                                </div>
+                                <button id="clear-monitor" title="Clear" class="text-gray-500 hover:text-gray-300 transition text-xs font-mono">
+                                    [CLR]
+                                </button>
+                            </div>
+
+                            <!-- Terminal Output -->
+                            <div id="serial-output" class="bg-gray-950 px-3 py-3 font-mono text-xs text-green-400 h-48 overflow-y-auto space-y-1 leading-relaxed">
+                                <div class="text-gray-600">--- Waiting for heartbeat data... ---</div>
+                            </div>
+
+                            <!-- Terminal Status Bar -->
+                            <div class="bg-gray-900 border-t border-gray-700 px-3 py-1.5 flex justify-between items-center">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-gray-500 text-xs font-mono">PING:</span>
+                                    <span id="device-ping" class="text-cyan-400 text-xs font-mono">-ms</span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-gray-500 text-xs font-mono">TEMP:</span>
+                                    <span id="device-temp" class="text-xs font-mono font-bold text-green-400">-°C</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span id="serial-dot" class="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                                    <span id="serial-status" class="text-gray-500 text-xs font-mono">IDLE</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
             <div class="block">
                 <div class="bg-gray-50 p-4 border-t grid grid-cols-2 border-gray-100 text-center">
                     <a href="/device" class="text-blue-600 text-sm font-semibold hover:text-blue-800 transition">Back to Devices</a>
@@ -99,145 +149,208 @@
             const socket = io();
             let previousValues = {};
             let relayTimeout = null;
+            let serialLineCount = 0;
+            const MAX_SERIAL_LINES = 100;
 
+            // ─── Accordion ────────────────────────────────────────────────
+            const accordionBtn     = document.getElementById('accordion-btn');
+            const accordionContent = document.getElementById('accordion-content');
+            const accordionIcon    = document.getElementById('accordion-icon');
+
+            accordionBtn.addEventListener('click', () => {
+                const isOpen = accordionContent.style.display !== 'none';
+                accordionContent.style.display = isOpen ? 'none' : 'block';
+                accordionIcon.style.transform  = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+            });
+
+            document.getElementById('clear-monitor').addEventListener('click', () => {
+                const output = document.getElementById('serial-output');
+                output.innerHTML = '<div class="text-gray-600">--- Monitor cleared ---</div>';
+                serialLineCount = 0;
+            });
+
+            // ─── Serial Monitor Helper ────────────────────────────────────
+            function serialLog(message, type = 'info') {
+                const output = document.getElementById('serial-output');
+                const colors = {
+                    info:    'text-green-400',
+                    warn:    'text-yellow-400',
+                    error:   'text-red-400',
+                    system:  'text-gray-500',
+                    value:   'text-cyan-400',
+                    temp:    'text-orange-400',
+                };
+
+                const now = new Date();
+                const ts  = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
+
+                const line = document.createElement('div');
+                line.className = `flex gap-2 ${colors[type] || colors.info}`;
+                line.innerHTML = `<span class="text-gray-600 select-none">[${ts}]</span><span>${message}</span>`;
+
+                output.appendChild(line);
+                serialLineCount++;
+
+                // Trim jika terlalu banyak baris
+                if (serialLineCount > MAX_SERIAL_LINES) {
+                    output.removeChild(output.firstChild);
+                }
+
+                output.scrollTop = output.scrollHeight;
+            }
+
+            function setSerialActive(active) {
+                const dot    = document.getElementById('serial-dot');
+                const status = document.getElementById('serial-status');
+                if (active) {
+                    dot.className    = 'w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse';
+                    status.className = 'text-green-400 text-xs font-mono';
+                    status.textContent = 'RX';
+                    setTimeout(() => setSerialActive(false), 800);
+                } else {
+                    dot.className    = 'w-1.5 h-1.5 rounded-full bg-gray-600';
+                    status.className = 'text-gray-500 text-xs font-mono';
+                    status.textContent = 'IDLE';
+                }
+            }
+
+            // ─── Toast ────────────────────────────────────────────────────
             function showToast(message, type = "info", duration = 3000) {
                 const colors = {
                     success: "bg-green-500",
-                    error: "bg-red-500",
-                    info: "bg-blue-500",
+                    error:   "bg-red-500",
+                    info:    "bg-blue-500",
                     warning: "bg-yellow-500"
                 };
-
                 const toast = document.createElement("div");
-                toast.className = `
-                    ${colors[type] || colors.info}
-                    text-white px-4 py-3 rounded-xl shadow-lg
-                    transform translate-x-full opacity-0
-                    transition-all duration-300 ease-in-out
-                    flex items-center gap-2 min-w-[220px]
-                `;
-
-                toast.innerHTML = `
-                    <span class="flex-1">${message}</span>
-                    <button class="opacity-70 hover:opacity-100">✕</button>
-                `;
+                toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-lg transform translate-x-full opacity-0 transition-all duration-300 ease-in-out flex items-center gap-2 min-w-[220px]`;
+                toast.innerHTML = `<span class="flex-1">${message}</span><button class="opacity-70 hover:opacity-100">✕</button>`;
                 document.getElementById("toast-container").appendChild(toast);
-
-                // animate in
-                setTimeout(() => {
-                    toast.classList.remove("translate-x-full", "opacity-0");
-                }, 10);
-
-                // close function
-                const removeToast = () => {
+                setTimeout(() => toast.classList.remove("translate-x-full", "opacity-0"), 10);
+                const remove = () => {
                     toast.classList.add("translate-x-full", "opacity-0");
                     setTimeout(() => toast.remove(), 300);
                 };
-
-                // close button
-                toast.querySelector("button").onclick = removeToast;
-
-                // auto close
-                setTimeout(removeToast, duration);
+                toast.querySelector("button").onclick = remove;
+                setTimeout(remove, duration);
             }
 
-            // Helper: Format Waktu (MySQL DateTime Format)
+            // ─── Helpers ──────────────────────────────────────────────────
             function formatTime(timestamp) {
                 const date = new Date(timestamp);
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                const seconds = String(date.getSeconds()).padStart(2, '0');
-                return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                const y  = date.getFullYear();
+                const mo = String(date.getMonth() + 1).padStart(2, '0');
+                const d  = String(date.getDate()).padStart(2, '0');
+                const h  = String(date.getHours()).padStart(2, '0');
+                const mi = String(date.getMinutes()).padStart(2, '0');
+                const s  = String(date.getSeconds()).padStart(2, '0');
+                return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
             }
 
-            // Helper: Update Relay Status (Data Changes)
             function updateRelayStatus(isActive) {
                 const status = document.getElementById('relay-status');
-                const dot = document.getElementById('relay-dot');
-                const text = document.getElementById('relay-text');
-
+                const dot    = document.getElementById('relay-dot');
+                const text   = document.getElementById('relay-text');
                 showToast(`Status Relay ${isActive ? 'ON' : 'OFF'} Pada Jam ${formatTime(new Date())}`, isActive ? 'success' : 'error');
-                
                 if (isActive) {
                     status.className = 'flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/20';
-                    dot.className = 'h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse';
-                    text.className = 'text-xs font-bold uppercase tracking-wider text-green-300';
+                    dot.className    = 'h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse';
+                    text.className   = 'text-xs font-bold uppercase tracking-wider text-green-300';
                     text.textContent = 'Online';
                 } else {
                     status.className = 'flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/20';
-                    dot.className = 'h-1.5 w-1.5 rounded-full bg-red-400';
-                    text.className = 'text-xs font-bold uppercase tracking-wider text-red-300';
+                    dot.className    = 'h-1.5 w-1.5 rounded-full bg-red-400';
+                    text.className   = 'text-xs font-bold uppercase tracking-wider text-red-300';
                     text.textContent = 'Offline';
                 }
-
-                // Clear existing timeout
                 if (relayTimeout) clearTimeout(relayTimeout);
-
-                // Set timeout to mark as offline after 30 seconds
                 if (isActive) {
-                    relayTimeout = setTimeout(() => {
-                        updateRelayStatus(false);
-                    }, 30000);
+                    relayTimeout = setTimeout(() => updateRelayStatus(false), 30000);
                 }
             }
 
-            // Helper: Update UI Indikator Koneksi (Header)
             function updateConnectionIndicator(isOnline) {
                 const badge = document.getElementById('device-connection-badge');
-                const ping = document.getElementById('conn-ping');
-                const dot = document.getElementById('conn-dot');
-                const text = document.getElementById('conn-text');
+                const ping  = document.getElementById('conn-ping');
+                const dot   = document.getElementById('conn-dot');
+                const text  = document.getElementById('conn-text');
                 showToast(`Device ${isOnline ? 'Connected' : 'Disconnected'} at ${formatTime(new Date())}`, isOnline ? 'success' : 'error');
                 if (isOnline) {
                     badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-green-500/10 border-green-500/50 text-green-400";
                     ping.classList.remove('hidden');
-                    ping.classList.add('animate-pulse-once', 'animate-ping');
-                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500";
+                    ping.classList.add('animate-ping');
+                    dot.className  = "relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500";
                     text.textContent = "Connected";
                 } else {
                     badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors duration-300 bg-red-500/10 border-red-500/50 text-red-400";
                     ping.classList.add('hidden');
-                    ping.classList.remove('animate-pulse-once', 'animate-ping');
-                    dot.className = "relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500";
+                    ping.classList.remove('animate-ping');
+                    dot.className  = "relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500";
                     text.textContent = "Disconnected";
                 }
             }
 
+            // ─── Socket Events ────────────────────────────────────────────
             socket.on('connect', () => {
                 console.log('Browser connected to Socket Server');
                 socket.emit('join-device', deviceId);
+                serialLog('Socket connected → joined room: ' + deviceId, 'system');
             });
 
-            // Event listener for device status (MQTT Connection)
             socket.on(`${deviceId}/device-status`, (data) => {
                 console.log('Device status update:', data);
-
-                // 1. Update Indikator Koneksi (Header)
+                setSerialActive(true);
                 if (data.status) {
                     const isOnline = (data.status === 'online');
                     updateConnectionIndicator(isOnline);
+                    serialLog(`device-status → ${data.status.toUpperCase()}`, isOnline ? 'info' : 'error');
                 }
-
-                // 2. Update Waktu (Heartbeat)
                 if (data.timestamp) {
                     const timeEl = document.querySelector('[data-last-active]');
                     if (timeEl) timeEl.textContent = formatTime(data.timestamp);
                 }
             });
 
-            // Event listener for relay/value data changes
             socket.on(`${deviceId}/value`, (data) => {
                 console.log('Device value update:', data);
-
+                setSerialActive(true);
                 updateRelayStatus(data.values.switch);
-
-                // Update last active
+                serialLog(`relay → switch: ${data.values.switch ? 'ON' : 'OFF'}`, data.values.switch ? 'value' : 'warn');
                 if (data.timestamp) {
                     const timeEl = document.querySelector('[data-last-active]');
                     if (timeEl) timeEl.textContent = formatTime(data.timestamp);
+                }
+            });
+
+            socket.on(`${deviceId}/heartbeat`, (data) => {
+                console.log('Device heartbeat update:', data);
+                setSerialActive(true);
+
+                if (data.ping !== undefined && data.ping !== null) {
+                    document.getElementById('device-ping').textContent = `${data.ping}ms`;
+                    serialLog(`ping → ${data.ping}ms`, 'value');
+                }
+
+                if (data.temperature !== undefined && data.temperature !== null) {
+                    const tempEl = document.getElementById('device-temp');
+                    const t      = data.temperature;
+                    tempEl.textContent = `${t}°C`;
+
+                    // Warna suhu di status bar
+                    if (t >= 80) {
+                        tempEl.className = 'text-xs font-mono font-bold text-red-400';
+                        serialLog(`temp → ${t}°C  ⚠ OVERHEAT!`, 'error');
+                    } else if (t >= 60) {
+                        tempEl.className = 'text-xs font-mono font-bold text-yellow-400';
+                        serialLog(`temp → ${t}°C  ▲ WARNING`, 'warn');
+                    } else {
+                        tempEl.className = 'text-xs font-mono font-bold text-green-400';
+                        serialLog(`temp → ${t}°C  ✓ Normal`, 'temp');
+                    }
+                }
+
+                if (data.timestamp) {
+                    serialLog(`heartbeat @ ${formatTime(data.timestamp)}`, 'system');
                 }
             });
 
@@ -248,20 +361,16 @@
         </script>
 
         <style>
-            /* Animasi kecil saat data berubah */
             @keyframes highlight {
-                0% {
-                    background-color: rgba(59, 130, 246, 0.1);
-                }
-
-                100% {
-                    background-color: transparent;
-                }
+                0%   { background-color: rgba(59, 130, 246, 0.1); }
+                100% { background-color: transparent; }
             }
+            .animate-pulse-once { animation: highlight 1s ease-out; }
 
-            .animate-pulse-once {
-                animation: highlight 1s ease-out;
-            }
+            /* Custom scrollbar untuk serial monitor */
+            #serial-output::-webkit-scrollbar       { width: 4px; }
+            #serial-output::-webkit-scrollbar-track  { background: #111827; }
+            #serial-output::-webkit-scrollbar-thumb  { background: #374151; border-radius: 2px; }
         </style>
     </body>
 
